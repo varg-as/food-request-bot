@@ -1,8 +1,7 @@
 """
 FOOD REQUEST DISCORD BOT - AUTO DM ALL MEMBERS
 
-This bot DMs ALL members in your server on Sundays and Wednesdays.
-No need to manually add user IDs!
+This bot DMs ALL members in the server on Sundays and Wednesdays.
 
 FEATURES:
 - Automatic DMs to everyone in the server (non-bots)
@@ -129,7 +128,7 @@ async def send_summary_to_reina():
         # Get Reina's DM
         reina = await bot.fetch_user(REINA_USER_ID)
         
-        # Count how many requests were submitted (you could track this in a global variable)
+        # Count how many requests were submitted (could track this in a global variable)
         # For now, just send a simple summary
         now = datetime.now()
         day_name = now.strftime("%A")
@@ -240,7 +239,7 @@ async def process_food_request(message):
     
     # Grass joke
     if 'grass' in content_lower and len(content.split(',')) == 1:
-        await message.reply("bestie that's called salad 🥗\n\n(or are u telling me to go outside? valid tbh)")
+        await message.reply("bae ur not eating grass idc)")
         return
     
     # Good vibes
@@ -250,12 +249,12 @@ async def process_food_request(message):
     
     # Dominos/pizza delivery
     if 'dominos' in content_lower or 'pizza hut' in content_lower or 'papa johns' in content_lower:
-        await message.reply("i tried to add a dominos integration\n\nreina said no 💔\n\n(she's right tho we have a food budget)")
+        await message.reply("i tried, reina wouldnt let me")
         return
     
     # Someone being a menace
     if 'deez nuts' in content_lower or 'ligma' in content_lower:
-        await message.reply("so funny 😐\n\nnow give me actual groceries or perish")
+        await message.reply("so funny 😐\n\nnow give me actual groceries")
         return
     
     # Parse items (comma-separated)
