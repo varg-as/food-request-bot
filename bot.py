@@ -50,7 +50,7 @@ app = Flask(__name__)
 
 @app.route('/notify', methods=['POST'])
 def handle_rejection_notification():
-    """Handle rejection notifications from Google Sheets"""
+    """Handle batched status update notifications from Google Sheets"""
     try:
         data = request.get_json()
         
@@ -59,12 +59,12 @@ def handle_rejection_notification():
             return jsonify({"success": False, "error": "Invalid secret"}), 401
         
         discord_user = data.get('discord_user')  # e.g., "username#1234"
-        item = data.get('item')
-        reason = data.get('reason', 'No reason provided')
+        approved_items = data.get('approved', [])  # List of approved items
+        rejected_items = data.get('rejected', [])  # List of {item, reason} objects
         
-        # Send the notification via Discord bot
+        # Send the batched notification via Discord bot
         asyncio.run_coroutine_threadsafe(
-            send_rejection_dm(discord_user, item, reason),
+            send_batched_update_dm(discord_user, approved_items, rejected_items),
             bot.loop
         )
         
@@ -82,8 +82,8 @@ def run_flask():
     """Run Flask in a separate thread"""
     app.run(host='0.0.0.0', port=8080)
 
-async def send_rejection_dm(discord_handle, item, reason):
-    """Send rejection DM to user"""
+async def send_batched_update_dm(discord_handle, approved_items, rejected_items):
+    """Send batched status update DM to user"""
     try:
         # Find user by username#discriminator
         username, discriminator = discord_handle.split('#')
@@ -102,22 +102,38 @@ async def send_rejection_dm(discord_handle, item, reason):
             print(f"❌ Could not find user: {discord_handle}")
             return
         
-        # Send DM
-        message = f"""
-❌ **Request Not Approved**
-
-your request for **{item}** was not approved.
-
-**reason:** {reason}
-
-if you have questions, talk to reina or add it manually to the [supplies tracker]({SUPPLIES_TRACKER_URL}) with a different priority level.
-        """
+        # Build message
+        message_parts = ["📊 **Your Request Update**\n"]
+        message_parts.append("hey! reina reviewed your requests. here's what happened:\n")
         
+        # Approved items
+        if approved_items and len(approved_items) > 0:
+            message_parts.append("\n✅ **APPROVED/PURCHASED:**")
+            for item in approved_items:
+                message_parts.append(f"• {item}")
+        
+        # Rejected items
+        if rejected_items and len(rejected_items) > 0:
+            message_parts.append("\n❌ **NOT APPROVED:**")
+            for rejection in rejected_items:
+                item = rejection.get('item', 'Unknown item')
+                reason = rejection.get('reason', 'No reason provided')
+                message_parts.append(f"• {item} - {reason}")
+        
+        # No changes
+        if (not approved_items or len(approved_items) == 0) and (not rejected_items or len(rejected_items) == 0):
+            message_parts.append("\nno status changes for your items yet!")
+        
+        message_parts.append(f"\nif you have questions, talk to reina or check the [supplies tracker]({SUPPLIES_TRACKER_URL})!")
+        
+        message = "\n".join(message_parts)
+        
+        # Send DM
         await user.send(message)
-        print(f"✅ Sent rejection notification to {discord_handle} for '{item}'")
+        print(f"✅ Sent batched update to {discord_handle}: {len(approved_items)} approved, {len(rejected_items)} rejected")
         
     except Exception as e:
-        print(f"❌ Failed to send rejection DM: {e}")
+        print(f"❌ Failed to send batched update DM: {e}")
 
 # ========== BOT SETUP ==========
 intents = discord.Intents.default()
@@ -545,4 +561,5 @@ if __name__ == "__main__":
     print("Flask server started on port 8080")
     
     # Start Discord bot
+    bot.run(DISCORD_BOT_TOKEN)
     bot.run(DISCORD_BOT_TOKEN)
