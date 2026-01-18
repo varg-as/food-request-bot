@@ -76,7 +76,7 @@ examples:
 i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
 
 **commands:**
-• `!test` - check if i'm alive
+• `!test` - check if i'm working
 • `!request` - get the full food request prompt
 • `!info` - see detailed instructions
 
@@ -105,16 +105,16 @@ async def send_dms_to_all_members():
     message = """
 🍌 **Food Request Time!** 🍌
 
-hey! it's time to submit ur grocery requests for the co-op order.
+hey! time to submit ur grocery requests for the co-op order.
 
 reply with items separated by commas:
 `grapes, kale, oat milk, bread`
 
-that's it! i'll add them to reina's tracker.
+i'll add them to reina's tracker automatically.
 
 orders go out soon so reply asap ‼️
 
-_(type `!info` for more info or `!test` to check if i'm working)_
+_(type `!info` for more details or `!test` to check if i'm working)_
     """
     
     # Get the first guild (your server)
@@ -176,18 +176,18 @@ async def process_food_request(message):
                      'xanax', 'cocaine', 'coke', 'drugs', 'marijuana', 'thc', 'cbd oil']
     if any(keyword in content_lower for keyword in drug_keywords):
         responses = [
-            "bestie this is a GROCERY bot 😭\n\n(also ur on a berkeley co-op discord, we can see this)",
+            "bestie this is a GROCERY bot 😭\n",
             "ma'am this is a wendy's\n\n(jk but like... wrong bot)",
             "i'm telling reina\n\n(jk i'm not a narc) (but maybe don't put this in writing)",
-            "the FBI has entered the chat\n\n(jk they dgaf about berkeley students)",
-            "added to cart ✅\n\n(jk i literally cannot do that) (this is a grocery bot) (go touch grass)"
+            "the FBI has entered the chat \n\n)",
+            "added to cart ✅\n\n(jk i literally cannot do that)"
         ]
         await message.reply(random.choice(responses))
         return
     
     # Grass joke
     if 'grass' in content_lower and len(content.split(',')) == 1:
-        await message.reply("bestie that's called salad 🥗\n\n(or are u telling me to go outside? valid tbh)")
+        await message.reply("bestie that's called salad 🥗\n\n")
         return
     
     # Good vibes
@@ -248,7 +248,7 @@ async def manual_request(ctx):
     await ctx.author.send("""
 🍌 FOOD REQUEST SZNNNN 🍌
 
-bestie wake up it's time to tell me what groceries u want
+!!! wake up it's time to tell me what groceries u want
 
 **the deal:**
 i'm reina's bot (she coded me at 3am fueled by pure spite and adderall) and i collect everyone's food requests for our bi-weekly co-op order
@@ -261,12 +261,14 @@ examples:
 `those purple carrots, good bread, not the mid bread`
 `anything chocolate, i'm going through it`
 
-i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
+this isn't anonymous so don't say anything sus....
+
+i'll add ur stuff to reina's spreadsheet and she'll try to order it hehe. 
 
 orders go out irregularly so reply soon or ur eating air ‼️
 
 **commands u can use:**
-• `!test` - check if i'm alive
+• `!test` - check if i'm working
 • `!request` - get this message again
 • `!info` - see the full manual
 
@@ -278,7 +280,7 @@ orders go out irregularly so reply soon or ur eating air ‼️
 async def test_command(ctx):
     """Test if bot is working (DM only)"""
     if isinstance(ctx.channel, discord.DMChannel):
-        await ctx.send("✅ yup i'm alive and ready to log ur grocery crimes\n\ntry sending: `grapes, kale` and i'll add it to the list fr fr")
+        await ctx.send("✅ yup i'm working! try sending: `grapes, kale` and i'll add it to the list")
 
 @bot.command(name='info')
 async def help_command(ctx):
@@ -295,12 +297,11 @@ collect ur food requests for the bi-weekly co-op order and add them to reina's t
 3. that's literally it
 
 **commands:**
-• `!test` - check if i'm alive
+• `!test` - check if i'm working
 • `!request` - manually trigger the food request prompt
 • `!info` - ur reading it rn bestie
 
-**created by:** reina (sophomore, chem major, stressed)
-**powered by:** coffee, chaos, and stackoverflow
+**created by:** reina who's super awesome and epic
 **bug reports:** dm reina and she'll fix it (eventually) (maybe)
 
 no i cannot order dominos. i tried. she said no. 💔
@@ -339,18 +340,18 @@ i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated
 
 examples:
 `grapes, kale, oat milk`
-`those purple carrots, good bread, not the mid bread`
+`those purple carrots, wheat bread`
 `anything chocolate, i'm going through it`
 
-i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
+i'll add ur stuff to reina's spreadsheet and she'll try to order it :p. 
 
 **commands:**
-• `!test` - check if i'm alive
+• `!test` - check if i'm working
 • `!request` - get the full food request prompt
 • `!info` - see detailed instructions
 
 - ur local kitchen manager bot 💚
-(powered by: chemistry homework procrastination)
+(powered by: homework procrastination)
     """
     
     sent = 0
