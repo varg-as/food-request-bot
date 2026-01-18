@@ -78,7 +78,7 @@ i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames gu
 **commands:**
 • `!test` - check if i'm alive
 • `!request` - get the full food request prompt
-• `!help` - see detailed instructions
+• `!info` - see detailed instructions
 
 - ur local kitchen manager bot 💚
 (powered by: chemistry homework procrastination)
@@ -114,7 +114,7 @@ that's it! i'll add them to reina's tracker.
 
 orders go out soon so reply asap ‼️
 
-_(type `!help` for more info or `!test` to check if i'm working)_
+_(type `!info` for more info or `!test` to check if i'm working)_
     """
     
     # Get the first guild (your server)
@@ -268,7 +268,7 @@ orders go out irregularly so reply soon or ur eating air ‼️
 **commands u can use:**
 • `!test` - check if i'm alive
 • `!request` - get this message again
-• `!help` - see the full manual
+• `!info` - see the full manual
 
 - ur local kitchen manager bot 💚
 (powered by: chemistry homework procrastination)
@@ -280,7 +280,7 @@ async def test_command(ctx):
     if isinstance(ctx.channel, discord.DMChannel):
         await ctx.send("✅ yup i'm alive and ready to log ur grocery crimes\n\ntry sending: `grapes, kale` and i'll add it to the list fr fr")
 
-@bot.command(name='help')
+@bot.command(name='info')
 async def help_command(ctx):
     """Show help message"""
     help_msg = """
@@ -297,7 +297,7 @@ collect ur food requests for the bi-weekly co-op order and add them to reina's t
 **commands:**
 • `!test` - check if i'm alive
 • `!request` - manually trigger the food request prompt
-• `!help` - ur reading it rn bestie
+• `!info` - ur reading it rn bestie
 
 **created by:** reina (sophomore, chem major, stressed)
 **powered by:** coffee, chaos, and stackoverflow
@@ -347,7 +347,7 @@ i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames gu
 **commands:**
 • `!test` - check if i'm alive
 • `!request` - get the full food request prompt
-• `!help` - see detailed instructions
+• `!info` - see detailed instructions
 
 - ur local kitchen manager bot 💚
 (powered by: chemistry homework procrastination)
