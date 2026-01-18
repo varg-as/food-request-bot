@@ -24,9 +24,21 @@ DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 APPS_SCRIPT_URL = os.getenv('APPS_SCRIPT_URL', 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE')
 API_SECRET = os.getenv('API_SECRET', 'your_secret_key_here_change_this')
 
+# Reina's Discord User ID (for notifications)
+REINA_USER_ID = 194648306188681216  # Replace with your actual Discord user ID
+
+# Google Sheet URL
+SUPPLIES_TRACKER_URL = "https://docs.google.com/spreadsheets/d/1HEyjrLRnenRwYeOgbvWMsdJJgrcV-GCuCOjD57brKO0/edit"
+
 # Schedule: Sunday and Wednesday at 7 PM
 REQUEST_DAYS = [6, 2]  # 6 = Sunday, 2 = Wednesday (0 = Monday)
 REQUEST_TIME = time(19, 0)  # 7:00 PM (use 24-hour format)
+
+# Summary schedule: Monday 9 AM and Wednesday 9 PM
+SUMMARY_SCHEDULE = [
+    (0, 9),   # Monday at 9 AM
+    (2, 21),  # Wednesday at 9 PM (21:00)
+]
 
 # ========== BOT SETUP ==========
 intents = discord.Intents.default()
@@ -57,7 +69,7 @@ async def on_member_join(member):
     if member.bot:
         return
     
-    welcome_msg = """
+    welcome_msg = f"""
 🍌 FOOD REQUEST SZNNNN 🍌
 
 hey! welcome to the server. i'm reina's food request bot.
@@ -72,6 +84,11 @@ examples:
 `grapes, kale, oat milk`
 `those purple carrots, good bread, not the mid bread`
 `anything chocolate, i'm going through it`
+
+**important notes:**
+• everything submitted through me is marked as **medium priority**
+• for **high priority** items, add them manually to the [supplies tracker]({SUPPLIES_TRACKER_URL})
+• house supplies (toilet paper, soap, etc) count too! don't wait till we're on our last roll :)
 
 i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
 
@@ -92,17 +109,52 @@ i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames gu
 
 @tasks.loop(hours=1)
 async def send_request_prompts():
-    """Check if it's time to send DM prompts"""
+    """Check if it's time to send DM prompts OR summaries"""
     now = datetime.now()
     
-    # Check if today is a request day and if it's the right time
+    # Check if it's time for DM prompts
     if now.weekday() in REQUEST_DAYS and now.hour == REQUEST_TIME.hour:
         print(f"Sending food request prompts at {now}")
         await send_dms_to_all_members()
+    
+    # Check if it's time for summary
+    for day, hour in SUMMARY_SCHEDULE:
+        if now.weekday() == day and now.hour == hour:
+            print(f"Sending biweekly summary at {now}")
+            await send_summary_to_reina()
+            break
+
+async def send_summary_to_reina():
+    """Send a summary of recent requests to Reina"""
+    try:
+        # Get Reina's DM
+        reina = await bot.fetch_user(REINA_USER_ID)
+        
+        # Count how many requests were submitted (you could track this in a global variable)
+        # For now, just send a simple summary
+        now = datetime.now()
+        day_name = now.strftime("%A")
+        time_of_day = "morning" if now.hour < 12 else "night"
+        
+        summary = f"""
+📊 **Biweekly Food Request Summary** - {day_name} {time_of_day}
+
+check out what people requested: [supplies tracker]({SUPPLIES_TRACKER_URL})
+
+don't forget to review and order soon! 🛒
+
+tip: sort by "requested" status to see what's new 💚
+        """
+        
+        await reina.send(summary)
+        print(f"✅ Sent summary to Reina")
+        
+    except Exception as e:
+        print(f"❌ Failed to send summary: {e}")
 
 async def send_dms_to_all_members():
     """Send DM to ALL members in the server (excluding bots) - SHORT VERSION"""
-    message = """
+    message = f"""
 🍌 **Food Request Time!** 🍌
 
 hey! time to submit ur grocery requests for the co-op order.
@@ -110,7 +162,9 @@ hey! time to submit ur grocery requests for the co-op order.
 reply with items separated by commas:
 `grapes, kale, oat milk, bread`
 
-i'll add them to reina's tracker automatically.
+i'll add them to reina's tracker automatically as **medium priority**.
+
+for high priority items or house supplies, add them manually: [supplies tracker]({SUPPLIES_TRACKER_URL})
 
 orders go out soon so reply asap ‼️
 
@@ -176,18 +230,18 @@ async def process_food_request(message):
                      'xanax', 'cocaine', 'coke', 'drugs', 'marijuana', 'thc', 'cbd oil']
     if any(keyword in content_lower for keyword in drug_keywords):
         responses = [
-            "bestie this is a GROCERY bot 😭\n",
+            "bestie this is a GROCERY bot 😭\n\n(also ur on a berkeley co-op discord, we can see this)",
             "ma'am this is a wendy's\n\n(jk but like... wrong bot)",
             "i'm telling reina\n\n(jk i'm not a narc) (but maybe don't put this in writing)",
-            "the FBI has entered the chat \n\n)",
-            "added to cart ✅\n\n(jk i literally cannot do that)"
+            "the FBI has entered the chat\n\n(jk they dgaf about berkeley students)",
+            "added to cart ✅\n\n(jk i literally cannot do that) (this is a grocery bot) (go touch grass)"
         ]
         await message.reply(random.choice(responses))
         return
     
     # Grass joke
     if 'grass' in content_lower and len(content.split(',')) == 1:
-        await message.reply("bestie that's called salad 🥗\n\n")
+        await message.reply("bestie that's called salad 🥗\n\n(or are u telling me to go outside? valid tbh)")
         return
     
     # Good vibes
@@ -232,6 +286,14 @@ async def process_food_request(message):
         if result.get("success"):
             items_list = "\n".join([f"• {item}" for item in items])
             await message.reply(f"✅ **bet, added to the list:**\n{items_list}\n\nreina will see this and hopefully remember to order it 🙏\n\nthanks bestie 💚")
+            
+            # Notify Reina
+            try:
+                reina = await bot.fetch_user(REINA_USER_ID)
+                notification = f"🔔 **New food request from {message.author.name}:**\n{items_list}"
+                await reina.send(notification)
+            except Exception as e:
+                print(f"Failed to notify Reina: {e}")
         else:
             error = result.get("error", "Unknown error")
             await message.reply(f"❌ something broke (not my fault) (probably reina's code) (jk love u reina)\n\ntry again in a sec or yell at reina on discord\n\nerror for the nerds: {error}")
@@ -245,10 +307,10 @@ async def process_food_request(message):
 @bot.command(name='request')
 async def manual_request(ctx):
     """Allow anyone to manually trigger request prompt - FULL VERSION"""
-    await ctx.author.send("""
+    await ctx.author.send(f"""
 🍌 FOOD REQUEST SZNNNN 🍌
 
-!!! wake up it's time to tell me what groceries u want
+bestie wake up it's time to tell me what groceries u want
 
 **the deal:**
 i'm reina's bot (she coded me at 3am fueled by pure spite and adderall) and i collect everyone's food requests for our bi-weekly co-op order
@@ -261,9 +323,12 @@ examples:
 `those purple carrots, good bread, not the mid bread`
 `anything chocolate, i'm going through it`
 
-this isn't anonymous so don't say anything sus....
+**important notes:**
+• everything submitted through me is marked as **medium priority**
+• for **high priority** items, add them manually to the [supplies tracker]({SUPPLIES_TRACKER_URL})
+• house supplies (toilet paper, soap, etc) count too! don't wait till we're on our last roll :)
 
-i'll add ur stuff to reina's spreadsheet and she'll try to order it hehe. 
+i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
 
 orders go out irregularly so reply soon or ur eating air ‼️
 
@@ -301,7 +366,8 @@ collect ur food requests for the bi-weekly co-op order and add them to reina's t
 • `!request` - manually trigger the food request prompt
 • `!info` - ur reading it rn bestie
 
-**created by:** reina who's super awesome and epic
+**created by:** reina (sophomore, chem major, stressed)
+**powered by:** coffee, chaos, and stackoverflow
 **bug reports:** dm reina and she'll fix it (eventually) (maybe)
 
 no i cannot order dominos. i tried. she said no. 💔
@@ -327,7 +393,7 @@ async def send_welcome_to_all(ctx):
         await ctx.send("❌ This command only works in a server!")
         return
     
-    welcome_msg = """
+    welcome_msg = f"""
 🍌 FOOD REQUEST SZNNNN 🍌
 
 hey! i'm reina's food request bot.
@@ -340,10 +406,15 @@ i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated
 
 examples:
 `grapes, kale, oat milk`
-`those purple carrots, wheat bread`
+`those purple carrots, good bread, not the mid bread`
 `anything chocolate, i'm going through it`
 
-i'll add ur stuff to reina's spreadsheet and she'll try to order it :p. 
+**important notes:**
+• everything submitted through me is marked as **medium priority**
+• for **high priority** items, add them manually to the [supplies tracker]({SUPPLIES_TRACKER_URL})
+• house supplies (toilet paper, soap, etc) count too! don't wait till we're on our last roll :)
+
+i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
 
 **commands:**
 • `!test` - check if i'm working
@@ -351,7 +422,7 @@ i'll add ur stuff to reina's spreadsheet and she'll try to order it :p.
 • `!info` - see detailed instructions
 
 - ur local kitchen manager bot 💚
-(powered by: homework procrastination)
+(powered by: chemistry homework procrastination)
     """
     
     sent = 0
