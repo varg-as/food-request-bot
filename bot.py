@@ -82,8 +82,7 @@ i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated
 
 examples:
 `grapes, kale, oat milk`
-`those purple carrots, good bread, not the mid bread`
-`anything chocolate, i'm going through it`
+`those purple carrots, wheat bread, chocolate, maple syrup`
 
 **important notes:**
 • everything submitted through me is marked as **medium priority**
