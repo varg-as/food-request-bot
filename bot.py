@@ -366,8 +366,7 @@ collect ur food requests for the bi-weekly co-op order and add them to reina's t
 • `!request` - manually trigger the food request prompt
 • `!info` - ur reading it rn bestie
 
-**created by:** reina (sophomore, chem major, stressed)
-**powered by:** coffee, chaos, and stackoverflow
+**created by:** reina who is super awesome and cool
 **bug reports:** dm reina and she'll fix it (eventually) (maybe)
 
 no i cannot order dominos. i tried. she said no. 💔
@@ -375,17 +374,25 @@ no i cannot order dominos. i tried. she said no. 💔
     await ctx.send(help_msg)
 
 @bot.command(name='testdm')
-@commands.has_permissions(administrator=True)
 async def test_dm_all(ctx):
-    """Manually trigger DMs to all members (admin only)"""
+    """Manually trigger DMs to all members"""
+    # Check if user is Reina
+    if ctx.author.id != REINA_USER_ID:
+        await ctx.send("❌ Only Reina can use this command!")
+        return
+    
     await ctx.send("Sending test DMs to all members...")
     await send_dms_to_all_members()
     await ctx.send("Done!")
 
 @bot.command(name='welcome')
-@commands.has_permissions(administrator=True)
 async def send_welcome_to_all(ctx):
-    """Send welcome message to ALL members (admin only)"""
+    """Send welcome message to ALL members"""
+    # Check if user is Reina
+    if ctx.author.id != REINA_USER_ID:
+        await ctx.send("❌ Only Reina can use this command!")
+        return
+    
     await ctx.send("Sending welcome messages to all members... this might take a minute")
     
     guild = ctx.guild
