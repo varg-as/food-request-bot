@@ -85,18 +85,25 @@ def run_flask():
 async def send_batched_update_dm(discord_handle, approved_items, rejected_items):
     """Send batched status update DM to user"""
     try:
-        # Find user by username#discriminator
-        username, discriminator = discord_handle.split('#')
-        
-        # Search through all guild members
         user = None
-        for guild in bot.guilds:
-            for member in guild.members:
-                if member.name == username and member.discriminator == discriminator:
-                    user = member
+        
+        # Check if it's a user ID (all digits)
+        if discord_handle.isdigit():
+            # Direct user ID lookup
+            user_id = int(discord_handle)
+            user = await bot.fetch_user(user_id)
+        else:
+            # Find user by username#discriminator
+            username, discriminator = discord_handle.split('#')
+            
+            # Search through all guild members
+            for guild in bot.guilds:
+                for member in guild.members:
+                    if member.name == username and member.discriminator == discriminator:
+                        user = member
+                        break
+                if user:
                     break
-            if user:
-                break
         
         if not user:
             print(f"❌ Could not find user: {discord_handle}")
@@ -561,5 +568,4 @@ if __name__ == "__main__":
     print("Flask server started on port 8080")
     
     # Start Discord bot
-    bot.run(DISCORD_BOT_TOKEN)
     bot.run(DISCORD_BOT_TOKEN)
