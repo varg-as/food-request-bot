@@ -1,7 +1,8 @@
 """
 FOOD REQUEST DISCORD BOT - AUTO DM ALL MEMBERS
 
-This bot DMs ALL members in the server on Sundays and Wednesdays.
+This bot DMs ALL members in your server on Sundays and Wednesdays.
+No need to manually add user IDs!
 
 FEATURES:
 - Automatic DMs to everyone in the server (non-bots)
@@ -17,6 +18,8 @@ from datetime import datetime, time
 import asyncio
 import os
 import random
+from threading import Thread
+from flask import Flask, request, jsonify
 
 # ========== CONFIGURATION ==========
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
@@ -25,6 +28,9 @@ API_SECRET = os.getenv('API_SECRET', 'your_secret_key_here_change_this')
 
 # Reina's Discord User ID (for notifications)
 REINA_USER_ID = 194648306188681216  # Replace with your actual Discord user ID
+
+# Rejection notification secret
+REJECTION_SECRET = "ATH_rejection_2025_secret"
 
 # Google Sheet URL
 SUPPLIES_TRACKER_URL = "https://docs.google.com/spreadsheets/d/1HEyjrLRnenRwYeOgbvWMsdJJgrcV-GCuCOjD57brKO0/edit"
@@ -38,6 +44,80 @@ SUMMARY_SCHEDULE = [
     (0, 9),   # Monday at 9 AM
     (2, 21),  # Wednesday at 9 PM (21:00)
 ]
+
+# ========== FLASK WEB SERVER ==========
+app = Flask(__name__)
+
+@app.route('/notify', methods=['POST'])
+def handle_rejection_notification():
+    """Handle rejection notifications from Google Sheets"""
+    try:
+        data = request.get_json()
+        
+        # Verify secret
+        if data.get('secret') != REJECTION_SECRET:
+            return jsonify({"success": False, "error": "Invalid secret"}), 401
+        
+        discord_user = data.get('discord_user')  # e.g., "username#1234"
+        item = data.get('item')
+        reason = data.get('reason', 'No reason provided')
+        
+        # Send the notification via Discord bot
+        asyncio.run_coroutine_threadsafe(
+            send_rejection_dm(discord_user, item, reason),
+            bot.loop
+        )
+        
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({"status": "online", "bot": "Food Request Bot"})
+
+def run_flask():
+    """Run Flask in a separate thread"""
+    app.run(host='0.0.0.0', port=8080)
+
+async def send_rejection_dm(discord_handle, item, reason):
+    """Send rejection DM to user"""
+    try:
+        # Find user by username#discriminator
+        username, discriminator = discord_handle.split('#')
+        
+        # Search through all guild members
+        user = None
+        for guild in bot.guilds:
+            for member in guild.members:
+                if member.name == username and member.discriminator == discriminator:
+                    user = member
+                    break
+            if user:
+                break
+        
+        if not user:
+            print(f"❌ Could not find user: {discord_handle}")
+            return
+        
+        # Send DM
+        message = f"""
+❌ **Request Not Approved**
+
+your request for **{item}** was not approved.
+
+**reason:** {reason}
+
+if you have questions, talk to reina or add it manually to the [supplies tracker]({SUPPLIES_TRACKER_URL}) with a different priority level.
+        """
+        
+        await user.send(message)
+        print(f"✅ Sent rejection notification to {discord_handle} for '{item}'")
+        
+    except Exception as e:
+        print(f"❌ Failed to send rejection DM: {e}")
 
 # ========== BOT SETUP ==========
 intents = discord.Intents.default()
@@ -81,7 +161,8 @@ i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated
 
 examples:
 `grapes, kale, oat milk`
-`those purple carrots, wheat bread, chocolate, maple syrup`
+`those purple carrots, good bread, not the mid bread`
+`anything chocolate, i'm going through it`
 
 **important notes:**
 • everything submitted through me is marked as **medium priority**
@@ -128,7 +209,7 @@ async def send_summary_to_reina():
         # Get Reina's DM
         reina = await bot.fetch_user(REINA_USER_ID)
         
-        # Count how many requests were submitted (could track this in a global variable)
+        # Count how many requests were submitted (you could track this in a global variable)
         # For now, just send a simple summary
         now = datetime.now()
         day_name = now.strftime("%A")
@@ -239,7 +320,7 @@ async def process_food_request(message):
     
     # Grass joke
     if 'grass' in content_lower and len(content.split(',')) == 1:
-        await message.reply("bae ur not eating grass idc)")
+        await message.reply("bestie that's called salad 🥗\n\n(or are u telling me to go outside? valid tbh)")
         return
     
     # Good vibes
@@ -249,12 +330,12 @@ async def process_food_request(message):
     
     # Dominos/pizza delivery
     if 'dominos' in content_lower or 'pizza hut' in content_lower or 'papa johns' in content_lower:
-        await message.reply("i tried, reina wouldnt let me")
+        await message.reply("i tried to add a dominos integration\n\nreina said no 💔\n\n(she's right tho we have a food budget)")
         return
     
     # Someone being a menace
     if 'deez nuts' in content_lower or 'ligma' in content_lower:
-        await message.reply("so funny 😐\n\nnow give me actual groceries")
+        await message.reply("so funny 😐\n\nnow give me actual groceries or perish")
         return
     
     # Parse items (comma-separated)
@@ -364,7 +445,8 @@ collect ur food requests for the bi-weekly co-op order and add them to reina's t
 • `!request` - manually trigger the food request prompt
 • `!info` - ur reading it rn bestie
 
-**created by:** reina who is super awesome and cool
+**created by:** reina (sophomore, chem major, stressed)
+**powered by:** coffee, chaos, and stackoverflow
 **bug reports:** dm reina and she'll fix it (eventually) (maybe)
 
 no i cannot order dominos. i tried. she said no. 💔
@@ -456,4 +538,11 @@ if __name__ == "__main__":
     print("1. DISCORD_BOT_TOKEN")
     print("2. APPS_SCRIPT_URL")
     print("3. API_SECRET")
+    
+    # Start Flask server in background thread
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    print("Flask server started on port 8080")
+    
+    # Start Discord bot
     bot.run(DISCORD_BOT_TOKEN)
