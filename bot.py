@@ -35,8 +35,16 @@ API_SECRET = os.getenv('API_SECRET', 'your_secret_key_here_change_this')
 
 # User IDs to DM (get these by enabling Developer Mode in Discord and right-clicking users)
 HOUSE_MEMBERS = [
-    123456789012345678,  # Replace with actual Discord user IDs
-    234567890123456789,
+    480977878025240576,
+516878349407354880,
+170388662062678016,
+564913037312524291,
+287369433809420289,
+904167477615927367,
+1400192088263491695,
+1369705334112911503,
+674773831419953176,
+761490254737309705,
     # Add more user IDs here
 ]
 
