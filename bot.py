@@ -1,21 +1,13 @@
 """
-FOOD REQUEST DISCORD BOT
+FOOD REQUEST DISCORD BOT - AUTO DM ALL MEMBERS
 
-This bot DMs house members on Sundays and Wednesdays to collect food requests.
-Members can simply reply with: "grapes, kale, lettuce, cabbage"
-
-SETUP:
-1. Install: pip install discord.py requests schedule
-2. Create Discord bot at https://discord.com/developers/applications
-3. Get bot token and add to this file
-4. Deploy Apps Script web app and add URL here
-5. Run: python food_request_bot.py
+This bot DMs ALL members in your server on Sundays and Wednesdays.
+No need to manually add user IDs!
 
 FEATURES:
-- Automatic DMs on Sunday/Wednesday at specified time
+- Automatic DMs to everyone in the server (non-bots)
 - Simple comma-separated input
 - Auto-populates Google Sheet via Apps Script
-- Confirms what was added
 """
 
 import discord
@@ -24,29 +16,13 @@ import requests
 import json
 from datetime import datetime, time
 import asyncio
+import os
+import random
 
 # ========== CONFIGURATION ==========
-# IMPORTANT: Store these in environment variables or Replit Secrets, NOT in code!
-import os
-
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 APPS_SCRIPT_URL = os.getenv('APPS_SCRIPT_URL', 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE')
 API_SECRET = os.getenv('API_SECRET', 'your_secret_key_here_change_this')
-
-# User IDs to DM (get these by enabling Developer Mode in Discord and right-clicking users)
-HOUSE_MEMBERS = [
-       194648306188681216,
-       480977878025240576,
-       516878349407354880,
-       170388662062678016,
-       564913037312524291,
-       287369433809420289,
-       904167477615927367,
-       1400192088263491695,
-       1369705334112911503,
-       674773831419953176,
-       761490254737309705,
-   ]
 
 # Schedule: Sunday and Wednesday at 7 PM
 REQUEST_DAYS = [6, 2]  # 6 = Sunday, 2 = Wednesday (0 = Monday)
@@ -57,18 +33,62 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.dm_messages = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Store pending requests
-pending_requests = {}
-
 @bot.event
 async def on_ready():
-    print(f'{bot.user} is now running!')
-    print(f'Bot ID: {bot.user.id}')
-    print(f'Scheduled for: Sundays and Wednesdays at {REQUEST_TIME}')
+    print('='*50)
+    print('🤖 Food Request Bot v2.0 online')
+    print(f'Bot: {bot.user}')
+    print(f'Connected to {len(bot.guilds)} server(s)')
+    for guild in bot.guilds:
+        print(f'  - {guild.name} ({guild.member_count} members)')
+    print(f'Scheduled DMs: Sundays & Wednesdays at {REQUEST_TIME}')
+    print('Current vibe: cautiously optimistic')
+    print('Powered by: caffeine and spite')
+    print('='*50)
     send_request_prompts.start()
+
+@bot.event
+async def on_member_join(member):
+    """Send welcome message to new members"""
+    if member.bot:
+        return
+    
+    welcome_msg = """
+🍌 FOOD REQUEST SZNNNN 🍌
+
+hey! welcome to the server. i'm reina's food request bot.
+
+**the deal:**
+i'm here to collect everyone's food requests for our bi-weekly co-op orders. reina coded me at 3am fueled by pure spite and adderall.
+
+**how to use me:**
+i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated by commas. that's literally it. i'm not complicated.
+
+examples:
+`grapes, kale, oat milk`
+`those purple carrots, good bread, not the mid bread`
+`anything chocolate, i'm going through it`
+
+i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
+
+**commands:**
+• `!test` - check if i'm alive
+• `!request` - get the full food request prompt
+• `!help` - see detailed instructions
+
+- ur local kitchen manager bot 💚
+(powered by: chemistry homework procrastination)
+    """
+    
+    try:
+        await member.send(welcome_msg)
+        print(f"✅ Sent welcome message to new member: {member.name}")
+    except:
+        print(f"❌ Couldn't send welcome message to {member.name}")
 
 @tasks.loop(hours=1)
 async def send_request_prompts():
@@ -78,32 +98,54 @@ async def send_request_prompts():
     # Check if today is a request day and if it's the right time
     if now.weekday() in REQUEST_DAYS and now.hour == REQUEST_TIME.hour:
         print(f"Sending food request prompts at {now}")
-        await send_dms_to_members()
+        await send_dms_to_all_members()
 
-async def send_dms_to_members():
-    """Send DM to all house members asking for food requests"""
+async def send_dms_to_all_members():
+    """Send DM to ALL members in the server (excluding bots) - SHORT VERSION"""
     message = """
-🥗 **Food Request Time!** 🥗
+🍌 **Food Request Time!** 🍌
 
-It's time to submit your food requests for this week's order.
+hey! it's time to submit ur grocery requests for the co-op order.
 
-**How to respond:**
-Just reply with items separated by commas, like:
-`grapes, kale, lettuce, cabbage`
+reply with items separated by commas:
+`grapes, kale, oat milk, bread`
 
-Or just single items:
-`grapes`
+that's it! i'll add them to reina's tracker.
 
-Your requests will be automatically added to the Kitchen Manager's tracker!
+orders go out soon so reply asap ‼️
+
+_(type `!help` for more info or `!test` to check if i'm working)_
     """
     
-    for user_id in HOUSE_MEMBERS:
+    # Get the first guild (your server)
+    if not bot.guilds:
+        print("Bot is not in any servers!")
+        return
+    
+    guild = bot.guilds[0]
+    print(f"Sending bi-weekly DMs to members of '{guild.name}'...")
+    
+    sent = 0
+    failed = 0
+    
+    for member in guild.members:
+        # Skip bots
+        if member.bot:
+            continue
+        
         try:
-            user = await bot.fetch_user(user_id)
-            await user.send(message)
-            print(f"Sent DM to {user.name}")
+            await member.send(message)
+            print(f"  ✅ Sent to {member.name}")
+            sent += 1
+            await asyncio.sleep(1)  # Rate limit: 1 second between DMs
+        except discord.Forbidden:
+            print(f"  ❌ Can't DM {member.name} (DMs disabled)")
+            failed += 1
         except Exception as e:
-            print(f"Failed to send DM to user {user_id}: {e}")
+            print(f"  ❌ Failed to DM {member.name}: {e}")
+            failed += 1
+    
+    print(f"\nDM Summary: {sent} sent, {failed} failed")
 
 @bot.event
 async def on_message(message):
@@ -113,9 +155,8 @@ async def on_message(message):
     
     # Only process DMs
     if isinstance(message.channel, discord.DMChannel):
-        # Check if message is from a house member
-        if message.author.id in HOUSE_MEMBERS:
-            await process_food_request(message)
+        # Accept requests from anyone who DMs the bot
+        await process_food_request(message)
     
     await bot.process_commands(message)
 
@@ -127,12 +168,53 @@ async def process_food_request(message):
     if content.startswith('!'):
         return
     
+    # EASTER EGGS - check before processing
+    content_lower = content.lower()
+    
+    # Drug jokes
+    drug_keywords = ['weed', 'edibles', 'molly', 'acid', 'shrooms', 'adderall', 'vyvanse', 
+                     'xanax', 'cocaine', 'coke', 'drugs', 'marijuana', 'thc', 'cbd oil']
+    if any(keyword in content_lower for keyword in drug_keywords):
+        responses = [
+            "bestie this is a GROCERY bot 😭\n\n(also ur on a berkeley co-op discord, we can see this)",
+            "ma'am this is a wendy's\n\n(jk but like... wrong bot)",
+            "i'm telling reina\n\n(jk i'm not a narc) (but maybe don't put this in writing)",
+            "the FBI has entered the chat\n\n(jk they dgaf about berkeley students)",
+            "added to cart ✅\n\n(jk i literally cannot do that) (this is a grocery bot) (go touch grass)"
+        ]
+        await message.reply(random.choice(responses))
+        return
+    
+    # Grass joke
+    if 'grass' in content_lower and len(content.split(',')) == 1:
+        await message.reply("bestie that's called salad 🥗\n\n(or are u telling me to go outside? valid tbh)")
+        return
+    
+    # Good vibes
+    if 'good vibes' in content_lower or 'vibes' in content_lower:
+        await message.reply("added to cart ✨\n\n(jk but i respect the energy) (unfortunately i can only add physical items)")
+        return
+    
+    # Dominos/pizza delivery
+    if 'dominos' in content_lower or 'pizza hut' in content_lower or 'papa johns' in content_lower:
+        await message.reply("i tried to add a dominos integration\n\nreina said no 💔\n\n(she's right tho we have a food budget)")
+        return
+    
+    # Someone being a menace
+    if 'deez nuts' in content_lower or 'ligma' in content_lower:
+        await message.reply("so funny 😐\n\nnow give me actual groceries or perish")
+        return
+    
     # Parse items (comma-separated)
     items = [item.strip() for item in content.split(',')]
     items = [item for item in items if item]  # Remove empty strings
     
+    # Too many items
+    if len(items) > 20:
+        await message.reply("okay gordon ramsay calm down 👨‍🍳\n\n(jk adding all of it but damn)")
+    
     if not items:
-        await message.reply("❌ I couldn't parse any items from your message. Try: `grapes, kale, lettuce`")
+        await message.reply("❌ bestie i literally cannot read this. try again but like... with actual items?\n\nexample: `grapes, kale, bread`\n\n(i'm just a bot i can't do critical thinking 😭)")
         return
     
     # Send to Google Sheets via Apps Script
@@ -149,42 +231,152 @@ async def process_food_request(message):
         
         if result.get("success"):
             items_list = "\n".join([f"• {item}" for item in items])
-            await message.reply(f"✅ **Added to request tracker:**\n{items_list}\n\nThank you!")
+            await message.reply(f"✅ **bet, added to the list:**\n{items_list}\n\nreina will see this and hopefully remember to order it 🙏\n\nthanks bestie 💚")
         else:
             error = result.get("error", "Unknown error")
-            await message.reply(f"❌ Failed to add requests: {error}\nPlease contact the Kitchen Manager.")
+            await message.reply(f"❌ something broke (not my fault) (probably reina's code) (jk love u reina)\n\ntry again in a sec or yell at reina on discord\n\nerror for the nerds: {error}")
             
     except Exception as e:
         print(f"Error submitting to Google Sheets: {e}")
-        await message.reply(f"❌ Error submitting your request. Please try again or contact the Kitchen Manager.")
+        await message.reply(f"❌ something broke (not my fault) (probably reina's code) (jk love u reina)\n\ntry again in a sec or yell at reina on discord\n\nerror for the nerds: {str(e)}")
 
 # ========== MANUAL COMMANDS ==========
 
 @bot.command(name='request')
 async def manual_request(ctx):
-    """Allow members to manually trigger request prompt"""
-    if ctx.author.id not in HOUSE_MEMBERS:
-        return
-    
+    """Allow anyone to manually trigger request prompt - FULL VERSION"""
     await ctx.author.send("""
-🥗 **Submit Food Requests** 🥗
+🍌 FOOD REQUEST SZNNNN 🍌
 
-Reply with items separated by commas:
-`grapes, kale, lettuce, cabbage`
+bestie wake up it's time to tell me what groceries u want
+
+**the deal:**
+i'm reina's bot (she coded me at 3am fueled by pure spite and adderall) and i collect everyone's food requests for our bi-weekly co-op order
+
+**how to use me:**
+literally just reply with what u want separated by commas. that's it. i'm not complicated.
+
+examples:
+`grapes, kale, oat milk`
+`those purple carrots, good bread, not the mid bread`
+`anything chocolate, i'm going through it`
+
+i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
+
+orders go out irregularly so reply soon or ur eating air ‼️
+
+**commands u can use:**
+• `!test` - check if i'm alive
+• `!request` - get this message again
+• `!help` - see the full manual
+
+- ur local kitchen manager bot 💚
+(powered by: chemistry homework procrastination)
     """)
 
 @bot.command(name='test')
 async def test_command(ctx):
     """Test if bot is working (DM only)"""
     if isinstance(ctx.channel, discord.DMChannel):
-        await ctx.send("✅ Bot is working! Try sending: `grapes, kale`")
+        await ctx.send("✅ yup i'm alive and ready to log ur grocery crimes\n\ntry sending: `grapes, kale` and i'll add it to the list fr fr")
+
+@bot.command(name='help')
+async def help_command(ctx):
+    """Show help message"""
+    help_msg = """
+📱 **reina's food request bot - user manual**
+
+**what i do:**
+collect ur food requests for the bi-weekly co-op order and add them to reina's tracker automatically
+
+**how to use:**
+1. i'll dm u every sun/wed at 7pm
+2. reply with items: `grapes, kale, oat milk`
+3. that's literally it
+
+**commands:**
+• `!test` - check if i'm alive
+• `!request` - manually trigger the food request prompt
+• `!help` - ur reading it rn bestie
+
+**created by:** reina (sophomore, chem major, stressed)
+**powered by:** coffee, chaos, and stackoverflow
+**bug reports:** dm reina and she'll fix it (eventually) (maybe)
+
+no i cannot order dominos. i tried. she said no. 💔
+    """
+    await ctx.send(help_msg)
+
+@bot.command(name='testdm')
+@commands.has_permissions(administrator=True)
+async def test_dm_all(ctx):
+    """Manually trigger DMs to all members (admin only)"""
+    await ctx.send("Sending test DMs to all members...")
+    await send_dms_to_all_members()
+    await ctx.send("Done!")
+
+@bot.command(name='welcome')
+@commands.has_permissions(administrator=True)
+async def send_welcome_to_all(ctx):
+    """Send welcome message to ALL members (admin only)"""
+    await ctx.send("Sending welcome messages to all members... this might take a minute")
+    
+    guild = ctx.guild
+    if not guild:
+        await ctx.send("❌ This command only works in a server!")
+        return
+    
+    welcome_msg = """
+🍌 FOOD REQUEST SZNNNN 🍌
+
+hey! i'm reina's food request bot.
+
+**the deal:**
+i'm here to collect everyone's food requests for our bi-weekly co-op orders. reina coded me at 3am fueled by pure spite and adderall.
+
+**how to use me:**
+i'll DM u every sunday & wednesday at 7pm. just reply with what u want separated by commas. that's literally it. i'm not complicated.
+
+examples:
+`grapes, kale, oat milk`
+`those purple carrots, good bread, not the mid bread`
+`anything chocolate, i'm going through it`
+
+i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames guey.
+
+**commands:**
+• `!test` - check if i'm alive
+• `!request` - get the full food request prompt
+• `!help` - see detailed instructions
+
+- ur local kitchen manager bot 💚
+(powered by: chemistry homework procrastination)
+    """
+    
+    sent = 0
+    failed = 0
+    
+    for member in guild.members:
+        if member.bot:
+            continue
+        
+        try:
+            await member.send(welcome_msg)
+            print(f"  ✅ Sent welcome to {member.name}")
+            sent += 1
+            await asyncio.sleep(1)
+        except:
+            print(f"  ❌ Failed to send to {member.name}")
+            failed += 1
+    
+    await ctx.send(f"✅ Done! Sent: {sent}, Failed: {failed}")
 
 # ========== RUN BOT ==========
 if __name__ == "__main__":
     print("Starting Food Request Bot...")
+    print("This bot will DM ALL server members on schedule.")
     print("Make sure you've configured:")
     print("1. DISCORD_BOT_TOKEN")
     print("2. APPS_SCRIPT_URL")
     print("3. API_SECRET")
-    print("4. HOUSE_MEMBERS list")
     bot.run(DISCORD_BOT_TOKEN)
