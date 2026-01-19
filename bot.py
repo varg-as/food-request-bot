@@ -151,6 +151,9 @@ intents.guilds = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Track pending confirmations (user_id -> {items, duplicates, timestamp})
+pending_confirmations = {}
+
 @bot.event
 async def on_ready():
     print('='*50)
@@ -324,6 +327,27 @@ async def process_food_request(message):
     if content.startswith('!'):
         return
     
+    # Check if user has a pending confirmation
+    if message.author.id in pending_confirmations:
+        pending = pending_confirmations[message.author.id]
+        
+        # Check if confirmation is still valid (within 5 minutes)
+        if (datetime.now() - pending['timestamp']).total_seconds() < 300:
+            if content.lower() == 'yes':
+                # User confirmed - add items anyway with force flag
+                items = pending['items']
+                await add_items_to_sheet(message, items, force=True)
+                del pending_confirmations[message.author.id]
+                return
+            else:
+                # User cancelled
+                await message.reply("okay, cancelled! you can send new items anytime 💚")
+                del pending_confirmations[message.author.id]
+                return
+        else:
+            # Confirmation expired
+            del pending_confirmations[message.author.id]
+    
     # EASTER EGGS - check before processing
     content_lower = content.lower()
     
@@ -373,16 +397,25 @@ async def process_food_request(message):
         await message.reply("❌ bestie i literally cannot read this. try again but like... with actual items?\n\nexample: `grapes, kale, bread`\n\n(i'm just a bot i can't do critical thinking 😭)")
         return
     
-    # Send to Google Sheets via Apps Script
+    # Process the request
+    await add_items_to_sheet(message, items, force=False)
+
+async def add_items_to_sheet(message, items, force=False):
+    """Add items to Google Sheet, with optional force flag to bypass duplicate check"""
     try:
         discord_handle = f"{message.author.name}#{message.author.discriminator}"
         
-        response = requests.post(APPS_SCRIPT_URL, json={
+        payload = {
             "secret": API_SECRET,
             "discord_user": discord_handle,
             "items": items
-        }, timeout=10)
+        }
         
+        # Add force flag if bypassing duplicates
+        if force:
+            payload["force"] = True
+        
+        response = requests.post(APPS_SCRIPT_URL, json=payload, timeout=10)
         result = response.json()
         
         if result.get("success"):
@@ -396,6 +429,44 @@ async def process_food_request(message):
                 await reina.send(notification)
             except Exception as e:
                 print(f"Failed to notify Reina: {e}")
+                
+        elif result.get("error") == "duplicate_items" and not force:
+            # Handle duplicate warning
+            duplicates = result.get("duplicates", [])
+            
+            warning_parts = ["⚠️ **heads up** - some items have issues:\n"]
+            clean_items = []
+            
+            for item in items:
+                # Check if this item is a duplicate
+                dup = next((d for d in duplicates if d['item'].lower() == item.lower()), None)
+                if dup:
+                    reason = dup['reason']
+                    days_ago = dup.get('daysAgo')
+                    
+                    if days_ago is not None:
+                        warning_parts.append(f"• **{item}** - {reason} ({days_ago} day{'s' if days_ago != 1 else ''} ago)")
+                    else:
+                        warning_parts.append(f"• **{item}** - {reason}")
+                else:
+                    clean_items.append(item)
+            
+            warning_parts.append("\ndo you still want to add them?")
+            warning_parts.append('• reply **"yes"** to add anyway')
+            warning_parts.append('• reply anything else to cancel')
+            
+            if clean_items:
+                warning_parts.append(f"\n_(these are fine: {', '.join(clean_items)})_")
+            
+            await message.reply("\n".join(warning_parts))
+            
+            # Store pending confirmation
+            pending_confirmations[message.author.id] = {
+                'items': items,
+                'duplicates': duplicates,
+                'timestamp': datetime.now()
+            }
+            
         else:
             error = result.get("error", "Unknown error")
             await message.reply(f"❌ something broke (not my fault) (probably reina's code) (jk love u reina)\n\ntry again in a sec or yell at reina on discord\n\nerror for the nerds: {error}")
