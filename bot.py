@@ -624,6 +624,29 @@ i'll add ur stuff to reina's spreadsheet and she'll try to order it. no mames gu
     
     await ctx.send(f"✅ Done! Sent: {sent}, Failed: {failed}")
 
+@bot.command(name='testrequest')
+async def test_request(ctx, *, items: str):
+    """Test food request system as if you were a user (Reina only)
+    Usage: !testrequest grapes, kale, oat milk"""
+    
+    # Only Reina can use this
+    if ctx.author.id != REINA_USER_ID:
+        await ctx.send("❌ Only Reina can use this command!")
+        return
+    
+    # Process the items as if it's a DM
+    class FakeMessage:
+        def __init__(self, author, content):
+            self.author = author
+            self.content = content
+            self.channel = type('obj', (object,), {'__class__': discord.DMChannel})()
+        
+        async def reply(self, content):
+            await ctx.send(f"**Bot would reply:**\n{content}")
+    
+    fake_msg = FakeMessage(ctx.author, items)
+    await add_items_to_sheet(fake_msg, [i.strip() for i in items.split(',') if i.strip()], force=False)
+
 # ========== RUN BOT ==========
 if __name__ == "__main__":
     print("Starting Food Request Bot...")
@@ -638,5 +661,7 @@ if __name__ == "__main__":
     flask_thread.start()
     print("Flask server started on port 8080")
     
+    # Start Discord bot
+    bot.run(DISCORD_BOT_TOKEN)
     # Start Discord bot
     bot.run(DISCORD_BOT_TOKEN)
