@@ -201,9 +201,42 @@ def _render_by_person(by_person):
     return lines
 
 
+# Same order as the BSC Quick Inventory Sheet, so the shopping list walks
+# the order form top to bottom instead of being sorted by item count.
+CATEGORY_ORDER = [
+    "Coffee and Beverages",
+    "Oils",
+    "Baking Flours",
+    "Baking Goods",
+    "Sweeteners",
+    "Veggies",
+    "Snacks and Frozen Snacks",
+    "Bread and Tortillas",
+    "Breakfast Cereals",
+    "Pastas",
+    "Canned and Non-Perishable",
+    "Condiments, Vinegars and Sauces",
+    "Spices and Seasonings",
+    "Dairy and Cold Grocery",
+    "Meat and Seafood",
+    "Vegan and Vegetarian Supplies",
+    "Cleaning and Sanitation",
+    "Paper and Disposables",
+    "Other",
+]
+
+
+def _category_rank(name):
+    """Inventory-sheet position; anything unrecognized sorts to the end."""
+    try:
+        return CATEGORY_ORDER.index(name)
+    except ValueError:
+        return len(CATEGORY_ORDER)
+
+
 def _render_by_category(by_category):
     lines = []
-    for category, items in sorted(by_category.items(), key=lambda kv: (-len(kv[1]), kv[0].lower())):
+    for category, items in sorted(by_category.items(), key=lambda kv: (_category_rank(kv[0]), kv[0].lower())):
         names = ", ".join(entry.get("item", "?") for entry in items)
         lines.append(f"**{category}** ({len(items)}): {names}")
     return lines
