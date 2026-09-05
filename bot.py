@@ -137,13 +137,24 @@ async def _get(params):
 
 
 async def set_opt_out(user_id, opted_out):
-    """Persist an opt-out in Apps Script's Script Properties."""
+    """
+    Persist an opt-out in Apps Script's Script Properties.
+
+    Returns the parsed result. Callers MUST check result["success"] before
+    telling the user it worked — a stale web-app deployment returns HTTP
+    200 with success: false, which is not an exception and will sail
+    straight through a bare try/except.
+    """
     try:
-        return await _post({
+        result = await _post({
             "secret": API_SECRET,
             "action": "optout" if opted_out else "optin",
             "discord_user_id": str(user_id),
         })
+        if not result.get("success"):
+            print(f"Opt-out rejected for {user_id}: {result.get('error')} "
+                  f"(is the Apps Script web app deployed at a current version?)")
+        return result
     except Exception as e:
         print(f"Failed to set opt-out for {user_id}: {e}")
         return {"success": False, "error": str(e)}
@@ -153,6 +164,12 @@ async def get_opt_outs():
     """Set of Discord IDs (strings) that asked not to be DM'd."""
     try:
         result = await _post({"secret": API_SECRET, "action": "optout_list"})
+        if not result.get("success"):
+            # An empty set here would look identical to "nobody opted out",
+            # so say so in the logs rather than guessing.
+            print(f"Opt-out list unavailable: {result.get('error')} "
+                  f"(check the Apps Script deployment version)")
+            return set()
         return set(str(x) for x in result.get("opted_out", []))
     except Exception as e:
         print(f"Failed to fetch opt-outs, assuming none: {e}")
@@ -161,6 +178,29 @@ async def get_opt_outs():
 
 async def fetch_summary():
     return await _get({"action": "summary", "secret": API_SECRET})
+
+
+async def notify_manager_of_failure(text):
+    """
+    A failed opt-out is the one error the user can't route around, so it
+    goes to the manager rather than only to stdout.
+    """
+    try:
+        reina = await bot.fetch_user(REINA_USER_ID)
+        await reina.send(text)
+    except Exception as e:
+        print(f"Couldn't notify manager: {e}")
+
+
+async def check_backend():
+    """Returns (ok, message) for the deployed Apps Script version."""
+    try:
+        result = await _get({"action": "status"})
+        version = result.get("version", "(none)")
+        ok = version == "3.0"
+        return ok, f"deployed version: {version}"
+    except Exception as e:
+        return False, f"unreachable: {e}"
 
 
 # ========== DIGEST FORMATTING ==========
@@ -554,19 +594,38 @@ async def handle_control_word(message, normalized, raw=""):
         normalized = 'help'
 
     if normalized in STOP_WORDS:
-        await set_opt_out(message.author.id, True)
-        await message.reply(
-            "got it, i'll stop DMing u 🫡\n\n"
-            "u can still send me items whenever u want, i just won't bug u.\n"
-            "reply `resume` if u change ur mind."
-        )
-        print(f"Opted out: {message.author.name} ({message.author.id})")
+        result = await set_opt_out(message.author.id, True)
+        if result.get("success"):
+            await message.reply(
+                "got it, i'll stop DMing u 🫡\n\n"
+                "u can still send me items whenever u want, i just won't bug u.\n"
+                "reply `resume` if u change ur mind."
+            )
+            print(f"Opted out: {message.author.name} ({message.author.id})")
+        else:
+            await message.reply(
+                "ok so i heard u but i couldn't actually save it 😬\n\n"
+                "reina's backend is being weird. tell her and she'll take u "
+                "off manually — u won't get spammed in the meantime i promise\n\n"
+                f"error for the nerds: {result.get('error', 'unknown')}"
+            )
+            await notify_manager_of_failure(
+                f"⚠️ **{message.author.name}** tried to opt out and the save failed.\n"
+                f"error: `{result.get('error', 'unknown')}`\n"
+                f"take them off manually until this is fixed."
+            )
         return True
 
     if normalized in RESUME_WORDS:
-        await set_opt_out(message.author.id, False)
-        await message.reply("ur back on the list 💚 see u sunday")
-        print(f"Opted back in: {message.author.name} ({message.author.id})")
+        result = await set_opt_out(message.author.id, False)
+        if result.get("success"):
+            await message.reply("ur back on the list 💚 see u sunday")
+            print(f"Opted back in: {message.author.name} ({message.author.id})")
+        else:
+            await message.reply(
+                "couldn't save that rn 😬 tell reina and she'll add u back manually\n\n"
+                f"error for the nerds: {result.get('error', 'unknown')}"
+            )
         return True
 
     if normalized in SKIP_WORDS:
@@ -869,6 +928,28 @@ async def digest_command(ctx):
         return  # silent — nobody else needs to know this exists
     await ctx.send("pulling it now...")
     await send_digest_to_manager()
+
+
+@bot.command(name='diag')
+async def diag_command(ctx):
+    """Is the backend the version this bot expects?"""
+    if ctx.author.id != REINA_USER_ID:
+        return
+
+    ok, detail = await check_backend()
+    lines = [f"{'✅' if ok else '❌'} apps script — {detail}"]
+    if not ok:
+        lines.append("")
+        lines.append("if the version isn't 3.0, the web app deployment is stale.")
+        lines.append("Deploy → Manage deployments → pencil → New version → Deploy.")
+
+    try:
+        opted = await get_opt_outs()
+        lines.append(f"✅ opt-out store reachable — {len(opted)} opted out")
+    except Exception as e:
+        lines.append(f"❌ opt-out store — {e}")
+
+    await ctx.send("\n".join(lines))
 
 
 @bot.command(name='optouts')
